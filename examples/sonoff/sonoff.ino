@@ -42,15 +42,17 @@ config_id_t type_id;
 typedef struct __sonoff_channel
 {
   int pin;
+  int btn_pin;
   config_id_t status_ga_id;
   bool state;
+  bool last_btn_state;
 } sonoff_channel_t;
 
 sonoff_channel_t channels[] = {
-  {CH1_PIN, 0, false},
-  {CH2_PIN, 0, false},
-  {CH3_PIN, 0, false},
-  {CH4_PIN, 0, false},
+  {CH1_PIN, BTN1_PIN, 0, false, false},
+  {CH2_PIN, BTN2_PIN, 0, false, false},
+  {CH3_PIN, BTN3_PIN, 0, false, false},
+  {CH4_PIN, BTN4_PIN, 0, false, false},
 };
 
 void setup()
@@ -75,10 +77,19 @@ void setup()
   channels[2].status_ga_id = knx.config_register_ga("Channel 3 Status GA", is_4ch_or_4ch_pro);
   channels[3].status_ga_id = knx.config_register_ga("Channel 4 Status GA", is_4ch_or_4ch_pro);
 
-  knx.register_callback("Channel 1", channel_cb, &channels[0]);
-  knx.register_callback("Channel 2", channel_cb, &channels[1], is_4ch_or_4ch_pro);
-  knx.register_callback("Channel 3", channel_cb, &channels[2], is_4ch_or_4ch_pro);
-  knx.register_callback("Channel 4", channel_cb, &channels[3], is_4ch_or_4ch_pro);
+  knx.callback_register("Channel 1", channel_cb, &channels[0]);
+  knx.callback_register("Channel 2", channel_cb, &channels[1], is_4ch_or_4ch_pro);
+  knx.callback_register("Channel 3", channel_cb, &channels[2], is_4ch_or_4ch_pro);
+  knx.callback_register("Channel 4", channel_cb, &channels[3], is_4ch_or_4ch_pro);
+
+  knx.feedback_register_bool("Channel 1 is on", &(channels[0].state));
+  knx.feedback_register_action("Toogle channel 1", toggle_chan, &channels[0]);
+  knx.feedback_register_bool("Channel 2 is on", &(channels[1].state), is_4ch_or_4ch_pro);
+  knx.feedback_register_action("Toogle channel 2", toggle_chan, &channels[1], is_4ch_or_4ch_pro);
+  knx.feedback_register_bool("Channel 3 is on", &(channels[2].state), is_4ch_or_4ch_pro);
+  knx.feedback_register_action("Toogle channel 3", toggle_chan, &channels[2], is_4ch_or_4ch_pro);
+  knx.feedback_register_bool("Channel 4 is on", &(channels[3].state), is_4ch_or_4ch_pro);
+  knx.feedback_register_action("Toogle channel 4", toggle_chan, &channels[3], is_4ch_or_4ch_pro);
 
   knx.load();
 
@@ -110,6 +121,16 @@ void setup()
 void loop()
 {
   knx.loop();
+
+  // Check local buttons
+  check_button(&channels[0]);
+  if (is_4ch_or_4ch_pro())
+  {
+    check_button(&channels[1]);
+    check_button(&channels[2]);
+    check_button(&channels[3]);
+  }
+
   delay(50);
 }
 
@@ -125,6 +146,26 @@ bool is_4ch_or_4ch_pro()
   return type == SONOFF_TYPE_4CH ||type == SONOFF_TYPE_4CH_PRO;
 }
 
+void check_button(sonoff_channel_t *chan)
+{
+  bool state_now = digitalRead(chan->btn_pin) == HIGH ? true : false;
+  if (state_now != chan->last_btn_state && state_now == LOW)
+  {
+    chan->state = !chan->state;
+    digitalWrite(chan->pin, chan->state ? HIGH : LOW);
+    knx.write_1bit(knx.config_get_ga(chan->status_ga_id), chan->state);
+  }
+  chan->last_btn_state = state_now;
+}
+
+void toggle_chan(void *arg)
+{
+  sonoff_channel_t *chan = (sonoff_channel_t *)arg;
+  chan->state = !chan->state;
+  digitalWrite(chan->pin, chan->state ? HIGH : LOW);
+  knx.write_1bit(knx.config_get_ga(chan->status_ga_id), chan->state);
+}
+
 void channel_cb(message_t const &msg, void *arg)
 {
   sonoff_channel_t *chan = (sonoff_channel_t *)arg;
@@ -134,9 +175,9 @@ void channel_cb(message_t const &msg, void *arg)
       chan->state = msg.data[0];
       Serial.println(chan->state ? "Toggle on" : "Toggle off");
       digitalWrite(chan->pin, chan->state ? HIGH : LOW);
-      knx.write1Bit(knx.config_get_ga(chan->status_ga_id), chan->state);
+      knx.write_1bit(knx.config_get_ga(chan->status_ga_id), chan->state);
       break;
      case KNX_CT_READ:
-      knx.answer1Bit(msg.received_on, chan->state);
+      knx.answer_1bit(msg.received_on, chan->state);
   }
 }
