@@ -385,7 +385,7 @@ class ESPKNXIP {
     callback_id_t callback_register(String name, callback_fptr_t cb, void *arg = nullptr, enable_condition_t cond = nullptr);
     void          callback_assign(callback_id_t id, address_t val);
 
-    void          udpAddress_set(const char *ip) { strncpy( udpAddress,ip,sizeof(udpAddress)-1); }
+    void          udpAddress_set(const char *ip) { strncpy( udpAddress,ip,sizeof(udpAddress)); }
     void          web_enable(bool enable) { b_web_enabled = enable; }
     void          physical_address_set(address_t const &addr);
     address_t     physical_address_get();
