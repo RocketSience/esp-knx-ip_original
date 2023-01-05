@@ -343,6 +343,7 @@ void ESPKNXIP::loop()
 {
   __loop_knx();
 }
+static const int ATTEMPTS = 3;
 
 void ESPKNXIP::__loop_knx()
 {
