@@ -45,6 +45,7 @@ void  ESPKNXIP::send_udp(uint8_t *datagram, size_t size)
   udp.beginPacket(udpAddress, MULTICAST_PORT);
   udp.write(datagram, size);
   udp.endPacket();
+  delay(1);
 }
 
 void ESPKNXIP::send_connect_request()
